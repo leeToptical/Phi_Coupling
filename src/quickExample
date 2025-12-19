@@ -1,0 +1,175 @@
+import numpy as np
+import random
+from typing import Tuple, List
+
+def golden_ratio_search(population_size: int = 40, 
+                       generations: int = 50,
+                       target_phi: float = 1.618033988749895) -> Tuple[float, float, List]:
+    """
+    Simplified evolutionary search for φ-coupling ratio inspired by the paper.
+    Memory-optimized for Colab.
+    """
+    
+    def fitness(alpha: float, beta: float) -> float:
+        """Calculate fitness based on proximity to φ"""
+        if beta == 0:
+            return 0
+        
+        ratio = alpha / beta
+        
+        # Proximity to φ (main fitness component)
+        phi_proximity = 1.0 / (1.0 + abs(ratio - target_phi))
+        
+        # Encourage balanced values (0.1-2.0 range as in paper)
+        balance_penalty = 0
+        if alpha > 2.0 or beta > 2.0 or alpha < 0.1 or beta < 0.1:
+            balance_penalty = 0.5
+        
+        return phi_proximity - balance_penalty
+    
+    def mutate(value: float, mutation_rate: float = 0.1) -> float:
+        """Small mutation"""
+        if random.random() < mutation_rate:
+            return value * (0.9 + 0.2 * random.random())
+        return value
+    
+    # Initialize population with random α,β pairs
+    population = []
+    for _ in range(population_size):
+        alpha = random.uniform(0.5, 2.0)
+        beta = random.uniform(0.5, 2.0)
+        population.append((alpha, beta, fitness(alpha, beta)))
+    
+    # Track evolution progress
+    history = []
+    
+    # Evolutionary loop
+    for gen in range(generations):
+        # Sort by fitness
+        population.sort(key=lambda x: x[2], reverse=True)
+        
+        # Keep top 50%
+        elite_size = population_size // 2
+        elites = population[:elite_size]
+        
+        # Generate new population
+        new_population = elites.copy()
+        
+        while len(new_population) < population_size:
+            # Tournament selection
+            parent1 = random.choice(elites)
+            parent2 = random.choice(elites)
+            
+            # Crossover
+            alpha_child = (parent1[0] + parent2[0]) / 2.0
+            beta_child = (parent1[1] + parent2[1]) / 2.0
+            
+            # Mutation
+            alpha_child = mutate(alpha_child)
+            beta_child = mutate(beta_child)
+            
+            # Calculate fitness
+            child_fitness = fitness(alpha_child, beta_child)
+            new_population.append((alpha_child, beta_child, child_fitness))
+        
+        population = new_population
+        
+        # Track best solution
+        best_alpha, best_beta, best_fitness = population[0]
+        ratio = best_alpha / best_beta if best_beta != 0 else 0
+        
+        history.append({
+            'generation': gen,
+            'best_ratio': ratio,
+            'alpha': best_alpha,
+            'beta': best_beta,
+            'error': abs(ratio - target_phi),
+            'fitness': best_fitness
+        })
+        
+        # Early stopping if we find good solution
+        if abs(ratio - target_phi) < 0.0001:
+            break
+    
+    # Get final best solution
+    population.sort(key=lambda x: x[2], reverse=True)
+    best_alpha, best_beta, best_fitness = population[0]
+    final_ratio = best_alpha / best_beta if best_beta != 0 else 0
+    
+    return final_ratio, abs(final_ratio - target_phi), history
+
+
+def visualize_evolution(history: List):
+    """Simple visualization of evolution progress"""
+    import matplotlib.pyplot as plt
+    
+    generations = [h['generation'] for h in history]
+    ratios = [h['best_ratio'] for h in history]
+    errors = [h['error'] for h in history]
+    
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 4))
+    
+    # Plot ratio convergence
+    ax1.plot(generations, ratios, 'b-', linewidth=2, label='α/β Ratio')
+    ax1.axhline(y=1.618033988749895, color='r', linestyle='--', 
+                label='Golden Ratio (φ)')
+    ax1.set_xlabel('Generation')
+    ax1.set_ylabel('α/β Ratio')
+    ax1.set_title('Convergence to Golden Ratio')
+    ax1.legend()
+    ax1.grid(True, alpha=0.3)
+    
+    # Plot error reduction
+    ax2.plot(generations, errors, 'g-', linewidth=2, label='Error')
+    ax2.set_xlabel('Generation')
+    ax2.set_ylabel('Absolute Error')
+    ax2.set_title('Error Reduction Over Generations')
+    ax2.legend()
+    ax2.grid(True, alpha=0.3)
+    ax2.set_yscale('log')
+    
+    plt.tight_layout()
+    plt.show()
+    
+    # Print final results
+    final = history[-1]
+    print(f"\n{'='*50}")
+    print("FINAL RESULTS:")
+    print(f"{'='*50}")
+    print(f"α/β Ratio: {final['best_ratio']:.6f}")
+    print(f"Golden Ratio (φ): 1.618034")
+    print(f"Absolute Error: {final['error']:.6f}")
+    print(f"Percentage Match: {100*(1-final['error']/1.618034):.4f}%")
+    print(f"α: {final['alpha']:.6f}, β: {final['beta']:.6f}")
+
+
+# Run the search
+print("Searching for φ-coupling ratio...")
+print("This mimics the evolutionary optimization from the paper.")
+print("Target: α/β → φ ≈ 1.618033988749895\n")
+
+final_ratio, error, history = golden_ratio_search(
+    population_size=100,
+    generations=500
+)
+
+# Show results
+visualize_evolution(history)
+
+# Additional analysis
+print("\n" + "="*50)
+print("PAPER COMPARISON:")
+print("="*50)
+print("Paper found: α/β = 1.61875 ± 0.00042")
+print(f"Our result: α/β = {final_ratio:.6f}")
+print(f"Deviation from φ: {error:.6f}")
+
+# Critical noise analysis (simplified)
+print("\n" + "="*50)
+print("CRITICAL NOISE ANALYSIS (simplified):")
+print("="*50)
+print("Paper critical noise floor: 4.15 × 10⁻⁵")
+print("Deviation causing collapse: ±0.05 × 10⁻⁵")
+print("\nOur φ-coupling ratio should enable similar")
+print("metastable coherence when combined with")
+print("precise stochastic resonance.")
